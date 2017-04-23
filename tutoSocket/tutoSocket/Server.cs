@@ -13,6 +13,7 @@ namespace tutoSocket
 {
     class Server : forwardToAll
     {
+        //http://stephaneey.developpez.com/tutoriel/dotnet/sockets/
         ArrayList readList = new ArrayList();   //liste utilisée par socket.select
         string msgString = null;    //contiendra le message envoyé aux autres clients
         string msgDisconnected = null; //Notification connexion/déconnexion
@@ -138,8 +139,79 @@ namespace tutoSocket
         /// </summary>
         private void getRead()
         {
-            http://stephaneey.developpez.com/tutoriel/dotnet/sockets/
+            while (true)
+            {
+                readList.Clear();
+                for (int i = 0; i < acceptList.Count; i++)
+                {
+                    readList.Add((Socket)acceptList[i]);
+                }
+                if (readList.Count > 0)
+                {
+                    Socket.Select(readList, null, null, 1000);
+                    for(int i = 0; i < readList.Count; i++)
+                    {
+                        if (((Socket)readList[i]).Available > 0)
+                        {
+                            readLock = true;
+                            int packetsReceived = 0;
+                            long sequence = 0;
+                            string Nick = null;
+                            string formattedMsg = null;
+                            while (((Socket)readList[i]).Available > 0)
+                            {
+                                msg = new byte[((Socket)readList[i]).Available];
+                                ((Socket)readList[i]).Receive(msg, msg.Length, SocketFlags.None);
+                                msgString = System.Text.Encoding.UTF8.GetString(msg);
+                                if (packetsReceived == 0)
+                                {
+                                    string seq = msgString.Substring(0, 6);
+                                    try
+                                    {
+                                        sequence = Convert.ToInt64(seq);
+                                        Nick = msgString.Substring(6, 15);
+                                        formattedMsg = rtfMsgEncStart + Nick.Trim() + " a écrit : " + rtfMsgContent +
+                                            msgString.Substring(20, (msgString.Length - 20)) + "\par";
+                                    }
+                                    catch
+                                    {
+                                        Console.Write("Message non conforme");      //uniquement dans le cas ou un client développé par qqun
+                                        acceptList.Remove(((Socket)readList[i]));   //d'autre tente de se connecter au serveur.
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    formattedMsg = rtfMsgContent + msgString + "\par";
+                                }
+                                msg = System.Text.Encoding.UTF8.GetBytes(formattedMsg);
+                                if (sequence == 1)
+                                {
+                                    if (!checkNick(Nick, ((Socket)readList[i])))
+                                    {
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        string rtfMessage = rtfConnMsgStart + Nick.Trim() + " vient de se connecter\par";
+                                        msg = System.Text.Encoding.UTF8.GetBytes(rtfMessage);
+                                    }
+                                }
+                            if (useLogging)
+                            {
+                                logging(formattedMsg);
+                            }
+                            //démarrage du thread renvoyant le message à tous les clients
+                            Thread forwardingThread = new Thread(new ThreadStart(writeToAll));
+                            forwardingThread.Start();
+                            forwardingThread.Join();
+                            packetsReceived++;
+                        }
+                        readLock = false;
+                    }
+                }
+            }
+            Thread.Sleep(10);
         }
-
     }
 }
