@@ -14,6 +14,8 @@ namespace tutoSocket
     class Server : forwardToAll
     {
         //http://stephaneey.developpez.com/tutoriel/dotnet/sockets/
+        //http://csharp.net-informations.com/communications/csharp-socket-programming.htm
+        //https://www.codeproject.com/Articles/463947/Working-with-Sockets-in-Csharp
         ArrayList readList = new ArrayList();   //liste utilisée par socket.select
         string msgString = null;    //contiendra le message envoyé aux autres clients
         string msgDisconnected = null; //Notification connexion/déconnexion
@@ -49,12 +51,12 @@ namespace tutoSocket
                     Console.WriteLine("Attente d'une nouvelle connexion...");
                     //l'exécution du thread courant est bloquée jusqu'à ce qu'un nouveau client se connecte
                     currentClient = serverSocket.Accept();
-                    Console.WriteLine("Nouveau client:"+currentClient.GetHashCode());
+                    Console.WriteLine("Nouveau client:" + currentClient.GetHashCode());
                     //stockage de la ressource dans l'arraylist acceptlist
                     acceptList.Add(currentClient);
                 }
             }
-            catch(SocketException e)
+            catch (SocketException e)
             {
                 Console.WriteLine(e.Message);
             }
@@ -62,7 +64,7 @@ namespace tutoSocket
         //Méthode permettant de générer du logging ds un fichier log selon que le membre useLogging soit à true ou false
         private void logging(string message)
         {
-            using(StreamWriter sw = File.AppendText("chatServer.log"))
+            using (StreamWriter sw = File.AppendText("chatServer.log"))
             {
                 sw.WriteLine(DateTime.Now + ": " + message);
             }
@@ -87,13 +89,13 @@ namespace tutoSocket
              */
             while (true)
             {
-                for(int i = 0; i < acceptList.Count; i++)
+                for (int i = 0; i < acceptList.Count; i++)
                 {
-                    if(((Socket)acceptList[i]).Poll(10,SelectMode.SelectRead) && ((Socket)acceptList[i]).Available == 0)
+                    if (((Socket)acceptList[i]).Poll(10, SelectMode.SelectRead) && ((Socket)acceptList[i]).Available == 0)
                     {
                         if (!readLock)
                         {
-                            Console.WriteLine("Client "+((Socket)acceptList[i]).GetHashCode()+" déconnecté");
+                            Console.WriteLine("Client " + ((Socket)acceptList[i]).GetHashCode() + " déconnecté");
                             removeNickname(((Socket)acceptList[i]));
                             ((Socket)acceptList[i]).Close();
                             acceptList.Remove(((Socket)acceptList[i]));
@@ -105,7 +107,7 @@ namespace tutoSocket
             }
         }
 
-        private bool checkNick(string nick,Socket Resource)
+        private bool checkNick(string nick, Socket Resource)
         {
             if (MatchList.Contains(nick))
             {
@@ -149,7 +151,7 @@ namespace tutoSocket
                 if (readList.Count > 0)
                 {
                     Socket.Select(readList, null, null, 1000);
-                    for(int i = 0; i < readList.Count; i++)
+                    for (int i = 0; i < readList.Count; i++)
                     {
                         if (((Socket)readList[i]).Available > 0)
                         {
@@ -171,7 +173,7 @@ namespace tutoSocket
                                         sequence = Convert.ToInt64(seq);
                                         Nick = msgString.Substring(6, 15);
                                         formattedMsg = rtfMsgEncStart + Nick.Trim() + " a écrit : " + rtfMsgContent +
-                                            msgString.Substring(20, (msgString.Length - 20)) + "\par";
+                                            msgString.Substring(20, (msgString.Length - 20)) + "/par";
                                     }
                                     catch
                                     {
@@ -182,7 +184,7 @@ namespace tutoSocket
                                 }
                                 else
                                 {
-                                    formattedMsg = rtfMsgContent + msgString + "\par";
+                                    formattedMsg = rtfMsgContent + msgString + "/par";
                                 }
                                 msg = System.Text.Encoding.UTF8.GetBytes(formattedMsg);
                                 if (sequence == 1)
@@ -197,21 +199,25 @@ namespace tutoSocket
                                         msg = System.Text.Encoding.UTF8.GetBytes(rtfMessage);
                                     }
                                 }
-                            if (useLogging)
-                            {
-                                logging(formattedMsg);
+                                if (useLogging)
+                                {
+                                    logging(formattedMsg);
+                                }
+                                //démarrage du thread renvoyant le message à tous les clients
+                                Thread forwardingThread = new Thread(new ThreadStart(writeToAll));
+                                forwardingThread.Start();
+                                forwardingThread.Join();
+                                packetsReceived++;
                             }
-                            //démarrage du thread renvoyant le message à tous les clients
-                            Thread forwardingThread = new Thread(new ThreadStart(writeToAll));
-                            forwardingThread.Start();
-                            forwardingThread.Join();
-                            packetsReceived++;
+                            readLock = false;
                         }
-                        readLock = false;
                     }
                 }
+                Thread.Sleep(10);
             }
-            Thread.Sleep(10);
         }
-    }
-}
+
+        
+
+
+    } }
